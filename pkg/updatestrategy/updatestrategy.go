@@ -17,6 +17,8 @@ type UpdateStrategy interface {
 type ProviderNodePoolsBackend interface {
 	Get(nodePool *api.NodePool) (*NodePool, error)
 	Scale(nodePool *api.NodePool, replicas int) error
+	UpdateSize(nodePool *api.NodePool) error
+	DeleteTags(nodePool *api.NodePool, tags map[string]string) error
 	Terminate(node *Node, decrementDesired bool) error
 }
 

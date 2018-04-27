@@ -129,6 +129,60 @@ func (n *ASGNodePoolsBackend) Scale(nodePool *api.NodePool, replicas int) error 
 	return err
 }
 
+// UpdateSize updates the sizes of a node pool.
+func (n *ASGNodePoolsBackend) UpdateSize(nodePool *api.NodePool) error {
+	asg, err := n.getNodePoolASG(nodePool)
+	if err != nil {
+		return err
+	}
+
+	desiredCapacity := aws.Int64Value(asg.DesiredCapacity)
+	if desiredCapacity < nodePool.MinSize {
+		desiredCapacity = nodePool.MinSize
+	}
+
+	if desiredCapacity > nodePool.MaxSize {
+		return fmt.Errorf("desired capacity is larger than max size %d/%d", desiredCapacity, nodePool.MaxSize)
+	}
+
+	params := &autoscaling.UpdateAutoScalingGroupInput{
+		AutoScalingGroupName: asg.AutoScalingGroupName,
+		DesiredCapacity:      aws.Int64(desiredCapacity),
+		MinSize:              aws.Int64(nodePool.MinSize),
+		MaxSize:              aws.Int64(nodePool.MaxSize),
+	}
+
+	_, err = n.asgClient.UpdateAutoScalingGroup(params)
+	return err
+}
+
+// DeleteTags deletes the specified tags from the node pool backend.
+func (n *ASGNodePoolsBackend) DeleteTags(nodePool *api.NodePool, tags map[string]string) error {
+	asg, err := n.getNodePoolASG(nodePool)
+	if err != nil {
+		return err
+	}
+
+	asgTags := make([]*autoscaling.Tag, 0, len(tags))
+
+	for key, val := range tags {
+		tag := &autoscaling.Tag{
+			Key:          aws.String(key),
+			Value:        aws.String(val),
+			ResourceId:   asg.AutoScalingGroupName,
+			ResourceType: aws.String("auto-scaling-group"),
+		}
+		asgTags = append(asgTags, tag)
+	}
+
+	params := &autoscaling.DeleteTagsInput{
+		Tags: asgTags,
+	}
+
+	_, err = n.asgClient.DeleteTags(params)
+	return err
+}
+
 // Terminate terminates a node from the ASG and optionally decrements the
 // DesiredCapacity. By default the desired capacity will not be decremented.
 func (n *ASGNodePoolsBackend) Terminate(node *Node, decrementDesired bool) error {
@@ -231,6 +285,11 @@ func (n *ASGNodePoolsBackend) getLaunchConfiguration(asg *autoscaling.Group) (*a
 
 // getInstancesToUpdate returns a list of instances with outdated userData.
 func (n *ASGNodePoolsBackend) getInstancesToUpdate(asg *autoscaling.Group) (map[string]bool, error) {
+	// return early if the ASG is empty
+	if len(asg.Instances) == 0 {
+		return nil, nil
+	}
+
 	launchConfig, err := n.getLaunchConfiguration(asg)
 	if err != nil {
 		return nil, err

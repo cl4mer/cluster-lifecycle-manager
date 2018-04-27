@@ -46,6 +46,10 @@ func (a *mockASGAPI) DescribeLoadBalancers(input *autoscaling.DescribeLoadBalanc
 	return a.descLB, a.err
 }
 
+func (a *mockASGAPI) DeleteTags(input *autoscaling.DeleteTagsInput) (*autoscaling.DeleteTagsOutput, error) {
+	return nil, a.err
+}
+
 type mockEC2API struct {
 	ec2iface.EC2API
 	err        error
