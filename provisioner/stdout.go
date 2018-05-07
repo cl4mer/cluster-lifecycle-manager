@@ -1,9 +1,9 @@
 package provisioner
 
 import (
+	log "github.com/sirupsen/logrus"
 	"github.com/zalando-incubator/cluster-lifecycle-manager/api"
 	"github.com/zalando-incubator/cluster-lifecycle-manager/channel"
-	log "github.com/sirupsen/logrus"
 )
 
 type stdoutProvisioner struct{}
@@ -29,6 +29,6 @@ func (p *stdoutProvisioner) Decommission(cluster *api.Cluster, channelConfig *ch
 }
 
 // Version mocks geting the version based on cluster resource and channel config.
-func (p *stdoutProvisioner) Version(cluster *api.Cluster, channelConfig *channel.Config) (string, error) {
+func (p *stdoutProvisioner) Version(cluster *api.Cluster, channelVersion channel.ConfigVersion) (string, error) {
 	return "", nil
 }
