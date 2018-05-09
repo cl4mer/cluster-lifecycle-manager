@@ -15,11 +15,15 @@ const (
 	updatePriorityNormal = iota
 	updatePriorityDecommissionRequested
 	updatePriorityAlreadyUpdating
+
+	stateIdle = iota
+	stateProcessing
+	stateProcessed
 )
 
 type ClusterInfo struct {
 	lastProcessed time.Time
-	processing    bool
+	state         int
 	Cluster       *api.Cluster
 	ConfigVersion channel.ConfigVersion
 }
@@ -65,14 +69,15 @@ func (clusterList *ClusterList) UpdateAvailable(channels channel.ConfigVersions,
 		}
 
 		if existing, ok := clusterList.clusters[cluster.ID]; ok {
-			if !existing.processing {
+			if existing.state != stateProcessing {
+				existing.state = stateIdle
 				existing.Cluster = cluster
 				existing.ConfigVersion = channelVersion
 			}
 		} else {
 			clusterList.clusters[cluster.ID] = &ClusterInfo{
 				lastProcessed: time.Unix(0, 0),
-				processing:    false,
+				state:         stateIdle,
 				Cluster:       cluster,
 				ConfigVersion: channelVersion,
 			}
@@ -82,7 +87,7 @@ func (clusterList *ClusterList) UpdateAvailable(channels channel.ConfigVersions,
 	for id, cluster := range clusterList.clusters {
 		// keep clusters that are still being updated to avoid race conditions
 		// if they're deleted and then added again
-		if cluster.processing {
+		if cluster.state == stateProcessing {
 			continue
 		}
 
@@ -115,7 +120,7 @@ func (clusterList *ClusterList) SelectNext() *ClusterInfo {
 	var nextClusterPriority uint32
 
 	for _, cluster := range clusterList.clusters {
-		if cluster.processing {
+		if cluster.state != stateIdle {
 			continue
 		}
 
@@ -136,7 +141,7 @@ func (clusterList *ClusterList) SelectNext() *ClusterInfo {
 		return nil
 	}
 
-	nextCluster.processing = true
+	nextCluster.state = stateProcessing
 	return nextCluster
 }
 
@@ -146,7 +151,7 @@ func (clusterList *ClusterList) ClusterProcessed(cluster *ClusterInfo) {
 	defer clusterList.Unlock()
 
 	if cluster, ok := clusterList.clusters[cluster.Cluster.ID]; ok {
-		cluster.processing = false
+		cluster.state = stateProcessed
 		cluster.lastProcessed = time.Now()
 	}
 }
