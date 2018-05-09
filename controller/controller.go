@@ -128,11 +128,11 @@ func (c *Controller) doProcessCluster(clusterInfo *ClusterInfo) error {
 		cluster.Status = &api.ClusterStatus{}
 	}
 
-	if clusterInfo.Version == "" {
+	if clusterInfo.ConfigVersion == "" {
 		return fmt.Errorf("no version for channel %s", cluster.Channel)
 	}
 
-	config, err := c.channelConfigSourcer.Get(clusterInfo.Version)
+	config, err := c.channelConfigSourcer.Get(clusterInfo.ConfigVersion)
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (c *Controller) doProcessCluster(clusterInfo *ClusterInfo) error {
 	switch cluster.LifecycleStatus {
 	case statusRequested, statusReady:
 		var nextVersion string
-		nextVersion, err = c.provisioner.Version(cluster, clusterInfo.Version)
+		nextVersion, err = cluster.Version(clusterInfo.ConfigVersion)
 		if err != nil {
 			return err
 		}
